@@ -132,7 +132,7 @@ Resources:
       DBInstanceClass: db.t2.micro
       Engine: MySQL
       MasterUsername: admin
-      MasterUserPassword: !Ref MyDBPasswordParameter
+      MasterUserPassword: '{{resolve:secretsmanager:MyRDSSecret:SecretString:password}}'
       AllocatedStorage: 20
       VPCSecurityGroups:
         - !Ref DatabaseSecurityGroup
