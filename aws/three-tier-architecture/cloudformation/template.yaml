@@ -75,7 +75,7 @@ Resources:
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet
+      Subnets: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
   # Security Groups
