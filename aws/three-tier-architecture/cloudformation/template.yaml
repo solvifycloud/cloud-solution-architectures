@@ -154,8 +154,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: WebServerLB
-      Subnets:
-        - !Ref PublicSubnet
+      SubnetId: !Ref PublicSubnet
       SecurityGroups:
         - !Ref WebServerSecurityGroup
       Tags:
