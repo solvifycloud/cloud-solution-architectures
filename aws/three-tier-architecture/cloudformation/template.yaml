@@ -132,7 +132,7 @@ Resources:
       DBInstanceClass: db.t2.micro
       Engine: MySQL
       MasterUsername: admin
-      MasterUserPassword: password  # Replace with a secure password
+      MasterUserPassword: !Ref MyDBPasswordParameter
       AllocatedStorage: 20
       VPCSecurityGroups:
         - !Ref DatabaseSecurityGroup
