@@ -75,7 +75,7 @@ Resources:
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      Subnets: !Ref PublicSubnet
+      SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
   # Security Groups
@@ -154,7 +154,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: WebServerLB
-      SubnetId: !Ref PublicSubnet
+      Subnets: !Ref PublicSubnet
       SecurityGroups:
         - !Ref WebServerSecurityGroup
       Tags:
