@@ -1,32 +1,50 @@
-# 3-Tier Architecture
+## 3-Tier Architecture Description
 
-## Overview
+### Overview
+The **3-Tier Architecture** is a common and widely used design pattern in cloud environments, particularly on AWS. It separates an application into three logical layers: the Presentation layer (frontend), the Application layer (backend), and the Data layer (database). This architecture enhances scalability, manageability, and security by isolating different components.
 
-The 3-tier architecture is a classic design pattern used for many types of applications. It consists of three layers: the presentation layer (frontend), the application layer (backend), and the data layer (database). Each tier is separated, allowing for scalability, flexibility, and manageability.
+### Components
 
-## Components
+1. **Virtual Private Cloud (VPC)**
+   - The VPC acts as a logically isolated network in the cloud where all resources in the architecture reside. It provides networking functionalities such as IP addressing, routing, and security.
 
-### Presentation Layer (Frontend)
+2. **Public Subnet**
+   - The Public Subnet is a section of the VPC that contains resources accessible from the internet. In this architecture:
+     - An **EC2 instance** labeled **Web Server** is deployed in the Public Subnet.
+     - The **Web Server** hosts the application frontend and handles incoming HTTP requests.
+     - A **Security Group** is attached to the Web Server, allowing inbound traffic on port 80 (HTTP) and port 22 (SSH).
 
-- **Amazon S3**: Hosts static files like HTML, CSS, and JavaScript. S3 is cost-effective and scalable, making it ideal for hosting static websites.
-- **Amazon CloudFront**: Acts as a Content Delivery Network (CDN) to deliver content with low latency by caching files at edge locations close to the user.
+3. **Private Subnet**
+   - The Private Subnet is another section of the VPC that is not directly accessible from the internet. It is used to host sensitive resources:
+     - An **RDS MySQL Database** instance is deployed in the Private Subnet.
+     - The database stores application data and is secured by a **Security Group** that only allows traffic on port 3306 (MySQL) from the Web Server's Security Group.
 
-### Application Layer (Backend)
+4. **Internet Gateway**
+   - The Internet Gateway is attached to the VPC to enable internet communication. It allows instances in the Public Subnet to receive and send traffic to the internet.
 
-- **Amazon EC2**: Runs the application logic. EC2 instances can be scaled horizontally using Auto Scaling Groups (ASGs) to handle varying levels of traffic.
-- **Elastic Load Balancer (ELB)**: Distributes incoming traffic across multiple EC2 instances to ensure reliability and availability.
+5. **Application Load Balancer (ALB)**
+   - The ALB distributes incoming traffic across multiple EC2 instances (Web Servers) to ensure high availability and fault tolerance.
+   - It is placed in front of the Web Server in the Public Subnet and handles all incoming HTTP traffic.
 
-### Data Layer (Database)
+### Traffic Flow
 
-- **Amazon RDS**: Provides a managed relational database (e.g., MySQL, PostgreSQL) with automatic backups, replication, and scaling.
-- **Amazon Aurora**: A highly performant and scalable database option, which is compatible with MySQL and PostgreSQL.
+1. **Inbound Traffic:**
+   - **Internet Gateway** allows external users to access the Web Server through the **ALB**.
+   - The ALB routes HTTP requests to the Web Server, which processes the requests and interacts with the database if necessary.
 
-## Scalability & High Availability
+2. **Internal Traffic:**
+   - The Web Server communicates with the **RDS MySQL Database** in the Private Subnet to fetch or store data.
 
-- **Auto Scaling**: Automatically adjusts the number of EC2 instances based on demand.
-- **Multi-AZ RDS**: Ensures that the database is highly available by running in multiple availability zones.
+3. **Outbound Traffic:**
+   - The Web Server can initiate outbound requests to the internet if required (e.g., for updates) through the Internet Gateway.
 
-## Security
+### Security
 
-- **VPC**: The entire architecture is deployed within a Virtual Private Cloud (VPC) with public and private subnets. The web servers (EC2) are in the public subnet, and the databases (RDS) are in the private subnet.
-Security Groups & NACLs: Fine-grained control over inbound and outbound traffic to the EC2 instances and RDS.
+- **Security Groups** provide fine-grained access control at the instance level, ensuring that only allowed traffic can reach the Web Server and Database.
+- The architecture isolates the database in a **Private Subnet**, enhancing security by preventing direct internet access.
+
+### Benefits
+
+- **Scalability**: The architecture supports horizontal scaling by adding more instances to the ALB.
+- **Manageability**: Isolating components into different layers simplifies management and troubleshooting.
+- **Security**: By separating public and private resources, the architecture improves the overall security posture of the application.
