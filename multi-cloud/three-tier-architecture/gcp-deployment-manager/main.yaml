@@ -1,1 +1,124 @@
+resources:
+  # Create VPC network
+  - name: my-vpc
+    type: compute.v1.network
+    properties:
+      autoCreateSubnetworks: false
+
+  # Create public subnet
+  - name: public-subnet
+    type: compute.v1.subnetwork
+    properties:
+      region: us-central1
+      network: $(ref.my-vpc.selfLink)
+      ipCidrRange: 10.0.1.0/24
+
+  # Create private subnet
+  - name: private-subnet
+    type: compute.v1.subnetwork
+    properties:
+      region: us-central1
+      network: $(ref.my-vpc.selfLink)
+      ipCidrRange: 10.0.2.0/24
+
+  # Create firewall rule for HTTP and SSH traffic to web server
+  - name: allow-http-ssh
+    type: compute.v1.firewall
+    properties:
+      network: $(ref.my-vpc.selfLink)
+      sourceRanges: ["0.0.0.0/0"]
+      allowed:
+        - IPProtocol: TCP
+          ports: ["80", "22"]
+      targetTags: ["web-server"]
+
+  # Create firewall rule for MySQL traffic to the database
+  - name: allow-mysql
+    type: compute.v1.firewall
+    properties:
+      network: $(ref.my-vpc.selfLink)
+      sourceRanges: ["10.0.1.0/24"]
+      allowed:
+        - IPProtocol: TCP
+          ports: ["3306"]
+      targetTags: ["db-server"]
+
+  # Create Compute Engine instance for the web server
+  - name: web-server
+    type: compute.v1.instance
+    properties:
+      zone: us-central1-a
+      machineType: zones/us-central1-a/machineTypes/f1-micro
+      tags:
+        items: ["web-server"]
+      networkInterfaces:
+        - network: $(ref.my-vpc.selfLink)
+          subnetwork: $(ref.public-subnet.selfLink)
+          accessConfigs:
+            - name: External NAT
+              type: ONE_TO_ONE_NAT
+      disks:
+        - boot: true
+          autoDelete: true
+          initializeParams:
+            sourceImage: projects/debian-cloud/global/images/family/debian-10
+      metadata:
+        items:
+          - key: startup-script
+            value: |
+              #! /bin/bash
+              apt-get update
+              apt-get install -y apache2
+              systemctl start apache2
+
+  # Create Cloud SQL instance (MySQL)
+  - name: my-mysql-instance
+    type: gcp-types/sqladmin-v1beta4:instances
+    properties:
+      region: us-central1
+      databaseVersion: MYSQL_5_7
+      settings:
+        tier: db-f1-micro
+        ipConfiguration:
+          privateNetwork: $(ref.my-vpc.selfLink)
+        backupConfiguration:
+          enabled: true
+      databaseFlags:
+        - name: skip-show-database
+          value: "true"
+      rootPassword: "your-password" # Replace with a secure password
+
+  # Create Global Load Balancer (HTTP)
+  - name: http-lb
+    type: compute.v1.globalForwardingRule
+    properties:
+      portRange: "80"
+      target: $(ref.http-lb-target.selfLink)
+
+  # Create HTTP proxy for Load Balancer
+  - name: http-lb-proxy
+    type: compute.v1.targetHttpProxy
+    properties:
+      urlMap: $(ref.http-lb-url-map.selfLink)
+
+  # Create URL map for Load Balancer
+  - name: http-lb-url-map
+    type: compute.v1.urlMap
+    properties:
+      defaultService: $(ref.http-lb-backend.selfLink)
+
+  # Create backend service for Load Balancer
+  - name: http-lb-backend
+    type: compute.v1.backendService
+    properties:
+      backends:
+        - group: $(ref.web-server.selfLink)
+      healthChecks:
+        - $(ref.http-lb-health-check.selfLink)
+
+  # Create health check for Load Balancer
+  - name: http-lb-health-check
+    type: compute.v1.httpHealthCheck
+    properties:
+      requestPath: "/"
 
