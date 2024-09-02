@@ -1,1 +1,196 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template for a 3-Tier Architecture
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 3TierVPC
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 3TierIGW
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs]
+      Tags:
+        - Key: Name
+          Value: PublicSubnet
+
+  # Private Subnet
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [0, !GetAZs]
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet
+
+  # Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # Security Groups
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable HTTP and SSH access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: WebServerSG
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable MySQL access from Web Servers
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: DatabaseSG
+
+  # EC2 Instance (Web Server)
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      SubnetId: !Ref PublicSubnet
+      ImageId: ami-0c55b159cbfafe1f0  # Replace with your preferred AMI ID
+      Tags:
+        - Key: Name
+          Value: WebServer
+
+  # RDS Instance (MySQL Database)
+  MySQLDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: db.t2.micro
+      Engine: MySQL
+      MasterUsername: admin
+      MasterUserPassword: password  # Replace with a secure password
+      AllocatedStorage: 20
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+
+  # Database Subnet Group
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS
+      SubnetIds:
+        - !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: DBSubnetGroup
+
+  # Application Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: WebServerLB
+      Subnets:
+        - !Ref PublicSubnet
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: LoadBalancer
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: WebServerTG
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 80
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      Tags:
+        - Key: Name
+          Value: WebServerTG
+
+Outputs:
+  LoadBalancerDNSName:
+    Description: The DNS name of the load balancer
+    Value: !GetAtt LoadBalancer.DNSName
 
