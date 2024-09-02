@@ -1,1 +1,17 @@
+name: CloudFormation Lint
+
+on: [push, pull_request]
+
+jobs:
+  cloudformation-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install cfn-lint
+        run: pip install cfn-lint
+
+      - name: Lint CloudFormation templates
+        run: cfn-lint aws/**/cloudformation/*.yaml
 
